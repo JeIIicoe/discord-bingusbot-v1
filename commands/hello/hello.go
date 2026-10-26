@@ -21,6 +21,12 @@ var greetings = []string{
 	"Howdy",
 	"Wassup",
 	"Meowdy",
+	// Oki wanted the following
+	"Hallo",
+	"Ahoy",
+	"Konnichiwa",
+	"Bonjour",
+	"Morn",
 }
 
 // responder is the subset of *discordgo.Session used to reply.
