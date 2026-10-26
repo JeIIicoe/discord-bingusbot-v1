@@ -7,12 +7,21 @@ import (
 	"syscall"
 
 	"github.com/bwmarrin/discordgo"
+	"github.com/joho/godotenv"
 
 	"bingusbot/handler"
 )
 
 // main is the entry point of the application. It initializes and runs the Discord bot.
 func main() {
+	fmt.Printf("Loading .env file...\n")
+	if err := godotenv.Load(); err != nil {
+		fmt.Fprintf(os.Stderr, "error loading .env file: %v\n", err)
+		os.Exit(1)
+	}
+	fmt.Printf(".env file loaded successfully.\n")
+
+	fmt.Printf("Starting bot...\n")
 	if err := run(); err != nil {
 		fmt.Fprintf(os.Stderr, "error: %v\n", err)
 		os.Exit(1)
@@ -28,7 +37,7 @@ func run() error {
 	if token == "" {
 		return fmt.Errorf("DISCORD_TOKEN is not set")
 	}
-	guildID := os.Getenv("GUILD_ID")
+	guildID := os.Getenv("DISCORD_GUILD_ID")
 
 	s, err := discordgo.New("Bot " + token)
 	if err != nil {

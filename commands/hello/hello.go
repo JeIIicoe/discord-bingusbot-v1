@@ -15,8 +15,8 @@ var Definition = &discordgo.ApplicationCommand{
 	Description: "Get a greeting from the bot",
 }
 
-// Greetings is the pool of greetings the command picks from.
-var Greetings = []string{
+// greetings is the pool of greetings the command picks from.
+var greetings = []string{
 	"Hello",
 	"Howdy",
 	"Wassup",
@@ -35,24 +35,24 @@ func Handle(s *discordgo.Session, i *discordgo.InteractionCreate) {
 	}
 }
 
+// respond sends the interaction response using the provided responder and pick function.
 func respond(r responder, i *discordgo.InteractionCreate, pick func(n int) int) error {
 	return r.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 		Type: discordgo.InteractionResponseChannelMessageWithSource,
 		Data: &discordgo.InteractionResponseData{
-			Content: Greeting(DisplayName(i.Interaction), pick),
+			Content: greeting(displayName(i.Interaction), pick),
 		},
 	})
 }
 
-// Greeting builds a greeting for name, using pick to choose from Greetings.
-func Greeting(name string, pick func(n int) int) string {
-	return fmt.Sprintf("%s %s!", Greetings[pick(len(Greetings))], name)
+// greeting builds a greeting for name, using pick to choose from greetings.
+func greeting(name string, pick func(n int) int) string {
+	return fmt.Sprintf("%s %s!", greetings[pick(len(greetings))], name)
 }
 
-// DisplayName returns the user's server nickname, falling back to their
-// global display name and then username. Interactions from DMs carry a User
-// rather than a Member? TODO: fix handling for DMs.
-func DisplayName(i *discordgo.Interaction) string {
+// displayName returns the user's server nickname, falling back to their
+// global display name and then username.
+func displayName(i *discordgo.Interaction) string {
 	switch {
 	case i.Member != nil && i.Member.User != nil:
 		return i.Member.DisplayName()

@@ -11,15 +11,15 @@ import (
 
 // Command pairs a slash command definition with the function that handles it.
 type Command struct {
-	Definition *discordgo.ApplicationCommand
-	Handler    func(s *discordgo.Session, i *discordgo.InteractionCreate)
+	definition *discordgo.ApplicationCommand
+	handler    func(s *discordgo.Session, i *discordgo.InteractionCreate)
 }
 
 // Commands lists every slash command the bot exposes. To add a command,
-// create a package under commands/ exporting Definition and Handle, then add
+// create a package under commands/ exporting definition and handle, then add
 // it here.
 var Commands = []Command{
-	{Definition: hello.Definition, Handler: hello.Handle},
+	{definition: hello.Definition, handler: hello.Handle},
 }
 
 // session is the subset of *discordgo.Session LoadCommands needs, so tests
@@ -29,11 +29,9 @@ type session interface {
 	ApplicationCommandBulkOverwrite(appID string, guildID string, commands []*discordgo.ApplicationCommand, options ...discordgo.RequestOption) ([]*discordgo.ApplicationCommand, error)
 }
 
-// LoadCommands registers cmds with Discord and routes incoming interactions to
+// loadCommands registers cmds with Discord and routes incoming interactions to
 // their handlers. Registration overwrites the application's existing commands,
-// so commands removed from cmds are also removed from Discord. An empty
-// guildID registers commands globally; a guild ID registers them for that
-// guild only, which takes effect immediately and suits development.
+// so commands removed from cmds are also removed from Discord.
 //
 // appID is the bot's application ID, available as s.State.User.ID once the
 // session is open.
@@ -45,7 +43,7 @@ func LoadCommands(s session, appID, guildID string, cmds []Command) error {
 
 	defs := make([]*discordgo.ApplicationCommand, len(cmds))
 	for i, c := range cmds {
-		defs[i] = c.Definition
+		defs[i] = c.definition
 	}
 	if _, err := s.ApplicationCommandBulkOverwrite(appID, guildID, defs); err != nil {
 		return fmt.Errorf("registering commands: %w", err)
@@ -57,19 +55,20 @@ func LoadCommands(s session, appID, guildID string, cmds []Command) error {
 	return nil
 }
 
+// buildHandlers constructs a map from command names to their handlers, ensuring no duplicates or missing definitions.
 func buildHandlers(cmds []Command) (map[string]func(*discordgo.Session, *discordgo.InteractionCreate), error) {
 	handlers := make(map[string]func(*discordgo.Session, *discordgo.InteractionCreate), len(cmds))
 	for _, c := range cmds {
-		if c.Definition == nil || c.Definition.Name == "" {
+		if c.definition == nil || c.definition.Name == "" {
 			return nil, fmt.Errorf("command has no definition or name")
 		}
-		if c.Handler == nil {
-			return nil, fmt.Errorf("command %q has no handler", c.Definition.Name)
+		if c.handler == nil {
+			return nil, fmt.Errorf("command %q has no handler", c.definition.Name)
 		}
-		if _, dup := handlers[c.Definition.Name]; dup {
-			return nil, fmt.Errorf("duplicate command name %q", c.Definition.Name)
+		if _, dup := handlers[c.definition.Name]; dup {
+			return nil, fmt.Errorf("duplicate command name %q", c.definition.Name)
 		}
-		handlers[c.Definition.Name] = c.Handler
+		handlers[c.definition.Name] = c.handler
 	}
 	return handlers, nil
 }
