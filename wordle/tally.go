@@ -57,5 +57,13 @@ func (week *Week) Record(date string, results map[string]int, names map[string]s
 
 	// best practice to just return true if recording succeeded.
 	// this doesn't handle json thing.
+	week.backdate(elapsed)
 	return true
+}
+
+func (week *Week) backdate(elapsed int) {
+	for _, player := range week.Players {
+		player.DaysPlayed = len(player.Results)
+		player.Score = sum(player.Results) + MaxScore*(elapsed-player.DaysPlayed)
+	}
 }

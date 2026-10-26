@@ -24,7 +24,7 @@ var greetings = []string{
 	// Oki wanted the following
 	"Hallo",
 	"Ahoy",
-	"Konichiwa",
+	"Konnichiwa",
 	"Bonjour",
 	"Morn",
 }
