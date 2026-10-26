@@ -1,6 +1,8 @@
 ## 0.1.1
 ### Added
 - Basic JSON IO
+- Template files
+- Oki wanted some more greetings
 
 ## 0.1.0
 ### Added

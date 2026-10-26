@@ -26,6 +26,7 @@ var greetings = []string{
 	"Ahoy",
 	"Konichiwa",
 	"Bonjour",
+	"Morn",
 }
 
 // responder is the subset of *discordgo.Session used to reply.

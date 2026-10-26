@@ -36,6 +36,8 @@ func parseResults(content string) map[string]int {
 			score, _ = strconv.Atoi(line[1])
 		}
 
+		// UPDATE TO HAVE X / NON COMPLETION AS 7 INSTEAD OF 6
+
 		for _, m := range mentionRe.FindAllStringSubmatch(line[2], -1) {
 			results[m[1]] = score
 		}
