@@ -1,3 +1,8 @@
+## 0.1.2
+### Added
+- Recording logic
+- Upped missing a day or failing to +7 points from 6
+
 ## 0.1.1
 ### Added
 - Basic JSON IO

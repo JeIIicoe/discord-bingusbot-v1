@@ -14,8 +14,8 @@ const (
 	lifetimeFile = "lifetime_tally.json"
 )
 
-// loadJSON reads path into v, leaving v untouched if the file doesn't exist.
-func loadJSON(path string, v any) error {
+// loadJSON reads path into target, leaving target untouched if the file doesn't exist.
+func loadJSON(path string, target any) error {
 	data, err := os.ReadFile(path)
 
 	if errors.Is(err, fs.ErrNotExist) {
@@ -26,17 +26,17 @@ func loadJSON(path string, v any) error {
 		return err
 	}
 
-	if err := json.Unmarshal(data, v); err != nil {
+	if err := json.Unmarshal(data, target); err != nil {
 		return fmt.Errorf("parsing %s: %w", path, err)
 	}
 
 	return nil
 }
 
-// saveJSON writes v to path via a temporary file, so a crash mid-write can't
+// saveJSON writes value to path via a temporary file, so a crash mid-write can't
 // leave a truncated file behind.
-func saveJSON(path string, v any) error {
-	data, err := json.MarshalIndent(v, "", "  ") // todo: validate
+func saveJSON(path string, value any) error {
+	data, err := json.MarshalIndent(value, "", "  ") // todo: validate
 
 	if err != nil {
 		return err
@@ -46,10 +46,10 @@ func saveJSON(path string, v any) error {
 		return err
 	}
 
-	tmp := path + ".tmp"
-	if err := os.WriteFile(tmp, data, 0o644); err != nil {
+	tempPath := path + ".tmp"
+	if err := os.WriteFile(tempPath, data, 0o644); err != nil {
 		return err
 	}
 
-	return os.Rename(tmp, path)
+	return os.Rename(tempPath, path)
 }
