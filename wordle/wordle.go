@@ -36,4 +36,8 @@ func process(message *discordgo.Message) error {
 		return fmt.Errorf("failed to record results for date %v", date)
 	}
 	return nil
+
+	// save json data back to source once it's down
+
+	// send msg AFTER save (independent func?)
 }
