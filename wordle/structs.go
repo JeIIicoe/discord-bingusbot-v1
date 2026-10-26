@@ -1,5 +1,7 @@
 package wordlecount
 
+// data storage structs for weekly and lifetime stats
+
 // obj for the week itself not individual players
 type Week struct {
 	Start     string                 `json:"weekStart"`     // Monday, YYYY-MM-DD ? cant do M T W etc
