@@ -1,4 +1,19 @@
+## 0.1.1
+### Added
+- Basic JSON IO
+
+## 0.1.0
+### Added
+- Wordle folder for leaderboard functionality
+- Basic parser for daily message 
+
+## 0.0.4
+### Added
+- .env for discord bridge
+- Install `godotenv`
+
 ## 0.0.3
+### Changed
 - Lint stuff
 - Update testing
 

@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	_ "time/tzdata" // embed timezone data so WORDLE_TIMEZONE works on any OS
 
 	"github.com/bwmarrin/discordgo"
 	"github.com/joho/godotenv"
@@ -43,7 +44,9 @@ func run() error {
 	if err != nil {
 		return fmt.Errorf("creating session: %w", err)
 	}
-	s.Identify.Intents = discordgo.IntentsGuilds
+	// Message content is a privileged intent: enable it under Bot in the
+	// Discord developer portal or the Wordle tracker sees empty messages.
+	s.Identify.Intents = discordgo.IntentsGuilds | discordgo.IntentsGuildMessages | discordgo.IntentsMessageContent
 
 	if err := s.Open(); err != nil {
 		return fmt.Errorf("opening connection: %w", err)
@@ -61,4 +64,11 @@ func run() error {
 
 	fmt.Println("Shutting down...")
 	return nil
+}
+
+func envOr(key, fallback string) string {
+	if v := os.Getenv(key); v != "" {
+		return v
+	}
+	return fallback
 }

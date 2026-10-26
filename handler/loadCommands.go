@@ -45,6 +45,7 @@ func LoadCommands(s session, appID, guildID string, cmds []Command) error {
 	for i, c := range cmds {
 		defs[i] = c.definition
 	}
+
 	if _, err := s.ApplicationCommandBulkOverwrite(appID, guildID, defs); err != nil {
 		return fmt.Errorf("registering commands: %w", err)
 	}
@@ -52,6 +53,7 @@ func LoadCommands(s session, appID, guildID string, cmds []Command) error {
 	s.AddHandler(func(s *discordgo.Session, i *discordgo.InteractionCreate) {
 		route(handlers, s, i)
 	})
+
 	return nil
 }
 
@@ -59,17 +61,22 @@ func LoadCommands(s session, appID, guildID string, cmds []Command) error {
 func buildHandlers(cmds []Command) (map[string]func(*discordgo.Session, *discordgo.InteractionCreate), error) {
 	handlers := make(map[string]func(*discordgo.Session, *discordgo.InteractionCreate), len(cmds))
 	for _, c := range cmds {
+
 		if c.definition == nil || c.definition.Name == "" {
 			return nil, fmt.Errorf("command has no definition or name")
 		}
+
 		if c.handler == nil {
 			return nil, fmt.Errorf("command %q has no handler", c.definition.Name)
 		}
+
 		if _, dup := handlers[c.definition.Name]; dup {
 			return nil, fmt.Errorf("duplicate command name %q", c.definition.Name)
 		}
+
 		handlers[c.definition.Name] = c.handler
 	}
+
 	return handlers, nil
 }
 
@@ -78,6 +85,7 @@ func route(handlers map[string]func(*discordgo.Session, *discordgo.InteractionCr
 	if i.Type != discordgo.InteractionApplicationCommand {
 		return
 	}
+
 	if h, ok := handlers[i.ApplicationCommandData().Name]; ok {
 		h(s, i)
 	}
