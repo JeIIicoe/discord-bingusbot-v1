@@ -65,10 +65,3 @@ func run() error {
 	fmt.Println("Shutting down...")
 	return nil
 }
-
-func envOr(key, fallback string) string {
-	if v := os.Getenv(key); v != "" {
-		return v
-	}
-	return fallback
-}
