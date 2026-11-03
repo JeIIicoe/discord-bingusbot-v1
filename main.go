@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"slices"
 	"syscall"
 	"time"
 	_ "time/tzdata" // embed timezone data so WORDLE_TIMEZONE works on any OS
@@ -13,6 +14,9 @@ import (
 
 	"bingusbot/handler"
 	wordlecount "bingusbot/wordle"
+	"bingusbot/wordle/commands/backfill"
+	"bingusbot/wordle/commands/post"
+	"bingusbot/wordle/commands/stats"
 )
 
 // main is the entry point of the application. It initializes and runs the Discord bot.
@@ -40,31 +44,37 @@ func run() error {
 	if token == "" {
 		return fmt.Errorf("DISCORD_TOKEN is not set")
 	}
-	guildID := os.Getenv("GUILD_ID")
 	dataDir := envOr("DATA_DIR", "data")
-	loc, err := time.LoadLocation(envOr("WORDLE_TIMEZONE", "Europe/London"))
+	timezone, err := time.LoadLocation(envOr("WORDLE_TIMEZONE", "Europe/London"))
 	if err != nil {
 		return fmt.Errorf("loading WORDLE_TIMEZONE: %w", err)
 	}
 
-	s, err := discordgo.New("Bot " + token)
+	session, err := discordgo.New("Bot " + token)
 	if err != nil {
 		return fmt.Errorf("creating session: %w", err)
 	}
 	// Message content is a privileged intent: enable it under Bot in the
 	// Discord developer portal or the Wordle tracker sees empty messages.
-	s.Identify.Intents = discordgo.IntentsGuilds | discordgo.IntentsGuildMessages | discordgo.IntentsMessageContent
-	s.AddHandler(wordlecount.New(dataDir, loc).Handle)
+	session.Identify.Intents = discordgo.IntentsGuilds | discordgo.IntentsGuildMessages | discordgo.IntentsMessageContent
+	tracker := wordlecount.New(dataDir, timezone)
+	session.AddHandler(tracker.Handle)
 
-	if err := s.Open(); err != nil {
+	commands := slices.Concat(handler.Commands, []handler.Command{
+		handler.NewCommand(backfill.Definition, backfill.Handle(tracker)),
+		handler.NewCommand(post.Definition, post.Handle(tracker)),
+		handler.NewCommand(stats.Definition, stats.Handle(tracker)),
+	})
+
+	if err := session.Open(); err != nil {
 		return fmt.Errorf("opening connection: %w", err)
 	}
-	defer s.Close()
+	defer session.Close()
 
-	if err := handler.LoadCommands(s, s.State.User.ID, guildID, handler.Commands); err != nil {
+	if err := handler.LoadCommands(session, session.State.User.ID, commands); err != nil {
 		return err
 	}
-	fmt.Printf("Logged in as %s with %d command(s). Press Ctrl+C to exit.\n", s.State.User.Username, len(handler.Commands))
+	fmt.Printf("Logged in as %s with %d command(s). Press Ctrl+C to exit.\n", session.State.User.Username, len(commands))
 
 	stop := make(chan os.Signal, 1)
 	signal.Notify(stop, os.Interrupt, syscall.SIGTERM)
@@ -74,9 +84,10 @@ func run() error {
 	return nil
 }
 
+// envOr returns the environment variable key, or fallback if it isn't set.
 func envOr(key, fallback string) string {
-	if v := os.Getenv(key); v != "" {
-		return v
+	if value := os.Getenv(key); value != "" {
+		return value
 	}
 	return fallback
 }

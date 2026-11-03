@@ -15,31 +15,33 @@ const (
 
 var (
 	// The Wordle app opens its daily results post with this line.
-	streakRe     = regexp.MustCompile(`(?i)your group is on an? \d+ day streak`)
-	resultLineRe = regexp.MustCompile(`(?m)([1-6X])/6:(.*)$`)
-	mentionRe    = regexp.MustCompile(`<@!?(\d+)>`)
+	streakPattern     = regexp.MustCompile(`(?i)your group is on an? \d+ day streak`)
+	resultLinePattern = regexp.MustCompile(`(?m)([1-6X])/6:(.*)$`)
+	mentionPattern    = regexp.MustCompile(`<@!?(\d+)>`)
 )
 
-// IsResultsPost reports whether content is the Wordle app's daily results post.
+// isResultsPost reports whether content is the Wordle app's daily results post.
 func isResultsPost(content string) bool {
-	return streakRe.MatchString(content)
+	return streakPattern.MatchString(content)
 }
 
-// ParseResults extracts each mentioned player's score from a results post,
+// parseResults extracts each mentioned player's score from a results post,
 // keyed by user ID. Failed games score MaxScore.
 func parseResults(content string) map[string]int {
-	results := make(map[string]int)
-	for _, resultLine := range resultLineRe.FindAllStringSubmatch(content, -1) {
+	scores := make(map[string]int)
+	for _, resultLine := range resultLinePattern.FindAllStringSubmatch(content, -1) {
+		guesses, mentions := resultLine[1], resultLine[2]
 		score := MaxScore
 
-		if resultLine[1] != "X" {
-			score, _ = strconv.Atoi(resultLine[1])
+		if guesses != "X" {
+			score, _ = strconv.Atoi(guesses)
 		}
 
-		for _, mention := range mentionRe.FindAllStringSubmatch(resultLine[2], -1) {
-			results[mention[1]] = score
+		for _, mention := range mentionPattern.FindAllStringSubmatch(mentions, -1) {
+			userID := mention[1]
+			scores[userID] = score
 		}
 	}
 
-	return results
+	return scores
 }

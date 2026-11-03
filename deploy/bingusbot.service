@@ -1,0 +1,20 @@
+[Unit]
+Description=Bingus Bot
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=bingus
+WorkingDirectory=/opt/bingusbot
+ExecStart=/opt/bingusbot/bingusbot
+Restart=always
+RestartSec=5
+
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ReadWritePaths=/opt/bingusbot/data
+
+[Install]
+WantedBy=multi-user.target

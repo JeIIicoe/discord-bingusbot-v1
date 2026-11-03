@@ -14,25 +14,26 @@ const dayCutoffHour = 6
 
 // DayIndex returns how many days date is after the week's start, with Monday = 0.
 func (week *Week) DayIndex(date string) int {
-	start, _ := time.Parse(dateLayout, week.Start)
+	weekStart, _ := time.Parse(dateLayout, week.Start)
 	parsedDate, _ := time.Parse(dateLayout, date)
-	return int(parsedDate.Sub(start).Hours() / 24)
+	return int(parsedDate.Sub(weekStart).Hours() / 24)
 }
 
-// PostDay returns the date (YYYY-MM-DD in loc) a results post posted at t
-// belongs to.
-func PostDay(t time.Time, loc *time.Location) string {
-	t = t.In(loc)
-	if t.Hour() < dayCutoffHour {
-		t = t.AddDate(0, 0, -1)
+// PostDay returns the date (YYYY-MM-DD in timezone) that a results post sent
+// at postedAt belongs to.
+func PostDay(postedAt time.Time, timezone *time.Location) string {
+	localTime := postedAt.In(timezone)
+	if localTime.Hour() < dayCutoffHour {
+		localTime = localTime.AddDate(0, 0, -1)
 	}
-	return t.Format(dateLayout)
+	return localTime.Format(dateLayout)
 }
 
 // WeekStart returns the Monday on or before date.
 func WeekStart(date string) string {
-	d, _ := time.Parse(dateLayout, date)
-	return d.AddDate(0, 0, -(int(d.Weekday())+6)%7).Format(dateLayout)
+	parsedDate, _ := time.Parse(dateLayout, date)
+	daysSinceMonday := (int(parsedDate.Weekday()) + 6) % 7
+	return parsedDate.AddDate(0, 0, -daysSinceMonday).Format(dateLayout)
 }
 
 // -- DATE TIME HANDLERS END
@@ -43,18 +44,18 @@ func WeekStart(date string) string {
 
 // this func adds a days results to the week and updates
 // player scores.
-func (week *Week) Record(date string, results map[string]int, names map[string]string) bool {
-	if slices.Contains(week.Days, date) {
+func (week *Week) Record(date string, scores map[string]int, displayNames map[string]string) bool {
+	if slices.Contains(week.ProcessedDays, date) {
 		return false
 	}
 
 	// append the new date to the week's list of days
-	week.Days = append(week.Days, date)
+	week.ProcessedDays = append(week.ProcessedDays, date)
 	if week.Players == nil {
 		week.Players = make(map[string]*WeekPlayer)
 	}
 
-	for userID, score := range results {
+	for userID, score := range scores {
 		player, found := week.Players[userID]
 
 		// if the player is not found, create a new WeekPlayer instance
@@ -64,15 +65,15 @@ func (week *Week) Record(date string, results map[string]int, names map[string]s
 			week.Players[userID] = player
 		}
 
-		if name := names[userID]; name != "" {
-			player.Name = name
+		if displayName := displayNames[userID]; displayName != "" {
+			player.Name = displayName
 		}
 		player.Results[date] = score
 	}
 
-	elapsed := 0
-	for _, day := range week.Days {
-		elapsed = max(elapsed, week.DayIndex(day)+1)
+	daysElapsed := 0
+	for _, day := range week.ProcessedDays {
+		daysElapsed = max(daysElapsed, week.DayIndex(day)+1)
 	}
 
 	// need to accomodate when someone didn't play
@@ -80,91 +81,110 @@ func (week *Week) Record(date string, results map[string]int, names map[string]s
 
 	// best practice to just return true if recording succeeded.
 	// this doesn't handle json thing.
-	week.backdate(elapsed)
+	week.backdate(daysElapsed)
 	return true
 }
 
-func (week *Week) backdate(elapsed int) {
+// backdate scores every player over the first daysElapsed days of the week,
+// counting each day they didn't play as MaxScore.
+func (week *Week) backdate(daysElapsed int) {
 	for _, player := range week.Players {
 		player.DaysPlayed = len(player.Results)
-		player.Score = sum(player.Results) + MaxScore*(elapsed-player.DaysPlayed)
+		player.Score = sum(player.Results) + MaxScore*(daysElapsed-player.DaysPlayed)
 	}
 }
 
 // Standings ranks the week's players, lowest score first. Ties share a rank
-// and are ordered by days played, then name.
-func (w *Week) Standings() []Standing {
-	out := make([]Standing, 0, len(w.Players))
+// and are ordered by days played, then name. The rank after a tie follows on
+// directly, so three players tied for 2nd are followed by 3rd, not 5th.
+func (week *Week) Standings() []Standing {
+	standings := make([]Standing, 0, len(week.Players))
 
-	for id, p := range w.Players {
-		out = append(out, Standing{UserID: id, WeekPlayer: p})
+	for userID, player := range week.Players {
+		standings = append(standings, Standing{UserID: userID, WeekPlayer: player})
 	}
 
-	slices.SortFunc(out, func(a, b Standing) int {
+	slices.SortFunc(standings, func(first, second Standing) int {
 		return cmp.Or(
-			cmp.Compare(a.Score, b.Score),
-			cmp.Compare(b.DaysPlayed, a.DaysPlayed),
-			cmp.Compare(a.Name, b.Name),
-			cmp.Compare(a.UserID, b.UserID),
+			cmp.Compare(first.Score, second.Score),
+			cmp.Compare(second.DaysPlayed, first.DaysPlayed),
+			cmp.Compare(first.Name, second.Name),
+			cmp.Compare(first.UserID, second.UserID),
 		)
 	})
 
-	for i := range out {
-		out[i].Rank = i + 1
-		if i > 0 && out[i].Score == out[i-1].Score {
-			out[i].Rank = out[i-1].Rank
+	for position := range standings {
+		switch {
+		case position == 0:
+			standings[position].Rank = 1
+		case standings[position].Score == standings[position-1].Score:
+			standings[position].Rank = standings[position-1].Rank
+		default:
+			standings[position].Rank = standings[position-1].Rank + 1
 		}
 	}
 
-	return out
+	return standings
 }
 
 // Finish scores the week over all seven days and adds it to lifetime. It
 // returns false without changing lifetime if this week was already merged.
-func (w *Week) Finish(lifetime *Lifetime) bool {
-	w.backdate(DaysPerWeek)
+func (week *Week) Finish(lifetime *Lifetime) bool {
+	week.backdate(DaysPerWeek)
 
-	if lifetime.LastWeek >= w.Start {
+	if lifetime.LastWeekMerged >= week.Start {
 		return false
 	}
 
-	lifetime.LastWeek = w.Start
+	lifetime.LastWeekMerged = week.Start
 	if lifetime.Players == nil {
 		lifetime.Players = make(map[string]*LifetimePlayer)
 	}
 
-	for id, p := range w.Players {
-		lp, ok := lifetime.Players[id]
+	// Everyone tied for 1st counts as having won the week.
+	winners := make(map[string]bool)
+	for _, standing := range week.Standings() {
+		if standing.Rank == 1 {
+			winners[standing.UserID] = true
+		}
+	}
 
-		if !ok {
-			lp = &LifetimePlayer{}
-			lifetime.Players[id] = lp
+	for userID, player := range week.Players {
+		lifetimePlayer, found := lifetime.Players[userID]
+
+		if !found {
+			lifetimePlayer = &LifetimePlayer{}
+			lifetime.Players[userID] = lifetimePlayer
 		}
 
-		if p.Name != "" {
-			lp.Name = p.Name
+		if player.Name != "" {
+			lifetimePlayer.Name = player.Name
 		}
 
-		lp.DaysPlayed += p.DaysPlayed
-		lp.WeeksPlayed++
-		if p.DaysPlayed == DaysPerWeek {
-			lp.CompleteWeeks++
+		lifetimePlayer.DaysPlayed += player.DaysPlayed
+		lifetimePlayer.WeeksPlayed++
+		if winners[userID] {
+			lifetimePlayer.WeeksWon++
+		}
+		if player.DaysPlayed == DaysPerWeek {
+			lifetimePlayer.CompleteWeeks++
 		}
 
-		lp.TotalScore += sum(p.Results)
-		if lp.DaysPlayed > 0 {
-			lp.AverageScore = math.Round(float64(lp.TotalScore)/float64(lp.DaysPlayed)*100) / 100
+		lifetimePlayer.TotalScore += sum(player.Results)
+		if lifetimePlayer.DaysPlayed > 0 {
+			average := float64(lifetimePlayer.TotalScore) / float64(lifetimePlayer.DaysPlayed)
+			lifetimePlayer.AverageScore = math.Round(average*100) / 100
 		}
 	}
 
 	return true
 }
 
-// sum returns the total of all values in the map.
-func sum(m map[string]int) int {
+// sum returns the total of all the scores in the map.
+func sum(scores map[string]int) int {
 	total := 0
-	for _, v := range m {
-		total += v
+	for _, score := range scores {
+		total += score
 	}
 	return total
 }
