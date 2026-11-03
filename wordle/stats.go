@@ -99,7 +99,7 @@ func statsEmbed(member *discordgo.Member, stats LifetimePlayer) *discordgo.Messa
 			{Name: "Total guesses", Value: fmt.Sprintf("**%d**", stats.TotalScore), Inline: true},
 		},
 		Footer: &discordgo.MessageEmbedFooter{
-			Text: fmt.Sprintf("This also includes this week so far!"),
+			Text: "This also includes this week so far!",
 		},
 	}
 }
