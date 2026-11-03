@@ -5,12 +5,14 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 	_ "time/tzdata" // embed timezone data so WORDLE_TIMEZONE works on any OS
 
 	"github.com/bwmarrin/discordgo"
 	"github.com/joho/godotenv"
 
 	"bingusbot/handler"
+	wordlecount "bingusbot/wordle"
 )
 
 // main is the entry point of the application. It initializes and runs the Discord bot.
@@ -38,7 +40,12 @@ func run() error {
 	if token == "" {
 		return fmt.Errorf("DISCORD_TOKEN is not set")
 	}
-	guildID := os.Getenv("DISCORD_GUILD_ID")
+	guildID := os.Getenv("GUILD_ID")
+	dataDir := envOr("DATA_DIR", "data")
+	loc, err := time.LoadLocation(envOr("WORDLE_TIMEZONE", "Europe/London"))
+	if err != nil {
+		return fmt.Errorf("loading WORDLE_TIMEZONE: %w", err)
+	}
 
 	s, err := discordgo.New("Bot " + token)
 	if err != nil {
@@ -47,6 +54,7 @@ func run() error {
 	// Message content is a privileged intent: enable it under Bot in the
 	// Discord developer portal or the Wordle tracker sees empty messages.
 	s.Identify.Intents = discordgo.IntentsGuilds | discordgo.IntentsGuildMessages | discordgo.IntentsMessageContent
+	s.AddHandler(wordlecount.New(dataDir, loc).Handle)
 
 	if err := s.Open(); err != nil {
 		return fmt.Errorf("opening connection: %w", err)
@@ -64,4 +72,11 @@ func run() error {
 
 	fmt.Println("Shutting down...")
 	return nil
+}
+
+func envOr(key, fallback string) string {
+	if v := os.Getenv(key); v != "" {
+		return v
+	}
+	return fallback
 }
