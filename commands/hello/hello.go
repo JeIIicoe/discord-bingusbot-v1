@@ -21,26 +21,32 @@ var greetings = []string{
 	"Howdy",
 	"Wassup",
 	"Meowdy",
+	// Oki wanted the following
+	"Hallo",
+	"Ahoy",
+	"Konnichiwa",
+	"Bonjour",
+	"Morn",
 }
 
-// responder is the subset of *discordgo.Session used to reply.
-type responder interface {
-	InteractionRespond(interaction *discordgo.Interaction, resp *discordgo.InteractionResponse, options ...discordgo.RequestOption) error
+// interactionResponder is the part of *discordgo.Session used to reply.
+type interactionResponder interface {
+	InteractionRespond(interaction *discordgo.Interaction, response *discordgo.InteractionResponse, options ...discordgo.RequestOption) error
 }
 
 // Handle responds to a /hello interaction.
-func Handle(s *discordgo.Session, i *discordgo.InteractionCreate) {
-	if err := respond(s, i, rand.IntN); err != nil {
+func Handle(session *discordgo.Session, interaction *discordgo.InteractionCreate) {
+	if err := respond(session, interaction, rand.IntN); err != nil {
 		fmt.Printf("hello: failed to respond: %v\n", err)
 	}
 }
 
-// respond sends the interaction response using the provided responder and pick function.
-func respond(r responder, i *discordgo.InteractionCreate, pick func(n int) int) error {
-	return r.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+// respond replies with a random greeting, picked by pick.
+func respond(responder interactionResponder, interaction *discordgo.InteractionCreate, pick func(n int) int) error {
+	return responder.InteractionRespond(interaction.Interaction, &discordgo.InteractionResponse{
 		Type: discordgo.InteractionResponseChannelMessageWithSource,
 		Data: &discordgo.InteractionResponseData{
-			Content: greeting(displayName(i.Interaction), pick),
+			Content: greeting(displayName(interaction.Interaction), pick),
 		},
 	})
 }
@@ -52,12 +58,12 @@ func greeting(name string, pick func(n int) int) string {
 
 // displayName returns the user's server nickname, falling back to their
 // global display name and then username.
-func displayName(i *discordgo.Interaction) string {
+func displayName(interaction *discordgo.Interaction) string {
 	switch {
-	case i.Member != nil && i.Member.User != nil:
-		return i.Member.DisplayName()
-	case i.User != nil:
-		return i.User.DisplayName()
+	case interaction.Member != nil && interaction.Member.User != nil:
+		return interaction.Member.DisplayName()
+	case interaction.User != nil:
+		return interaction.User.DisplayName()
 	default:
 		return "there"
 	}
