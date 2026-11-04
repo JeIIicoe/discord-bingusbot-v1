@@ -20,8 +20,8 @@ type channelHistory interface {
 	ChannelMessages(channelID string, limit int, beforeID, afterID, aroundID string, options ...discordgo.RequestOption) ([]*discordgo.Message, error)
 }
 
-// discardSender posts nothing. It's used when replaying old posts so the
-// channel doesn't get a tally for each one.
+// discardSender posts nothing. It's used when replaying old posts so an old
+// week finishing doesn't post its leaderboard.
 type discardSender struct{}
 
 func (discardSender) ChannelMessageSendComplex(string, *discordgo.MessageSend, ...discordgo.RequestOption) (*discordgo.Message, error) {
@@ -150,7 +150,7 @@ func (tracker *Tracker) loadLastWeek(sender messageSender, channelID, weekStart 
 }
 
 // loadThisWeek replays this week's posts through process, the same as live
-// ones, but with a sender that doesn't post the daily tally.
+// ones, but with a sender that doesn't post anything.
 func (tracker *Tracker) loadThisWeek(sender messageSender, channelID string, posts []*discordgo.Message, summary *backfillSummary) error {
 	for _, post := range posts {
 		counted, err := tracker.process(discardSender{}, post)

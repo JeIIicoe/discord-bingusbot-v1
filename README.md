@@ -2,7 +2,7 @@
 
 A fun little Discord bot that keeps score of your server's Wordle games.
 
-Whenever the Wordle app posts the day's results, Bingus Bot adds them to a weekly tally and replies with the running scores. On Sunday it posts the final leaderboard, with medals for the top three, then starts afresh on Monday.
+Whenever the Wordle app posts the day's results, Bingus Bot adds them to a weekly tally and reacts with 👀 to show it's seen them. On Sunday it posts the final leaderboard, with medals for the top three, then starts afresh on Monday.
 
 ## How scoring works
 
@@ -25,7 +25,7 @@ Whenever the Wordle app posts the day's results, Bingus Bot adds them to a weekl
 You'll need [Go](https://go.dev/dl/) installed.
 
 1. Create a bot in the [Discord Developer Portal](https://discord.com/developers/applications) and turn on **Message Content Intent** under **Bot**.
-2. Invite it to your server with permission to read messages, send messages and read message history.
+2. Invite it to your server with permission to read messages, send messages, read message history and add reactions.
 3. Make a `.env` file next to `main.go`:
 
    ```

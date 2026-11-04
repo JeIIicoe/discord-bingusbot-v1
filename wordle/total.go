@@ -63,8 +63,12 @@ func (tracker *Tracker) Handle(session *discordgo.Session, event *discordgo.Mess
 		return
 	}
 	err := catch(func() error {
-		_, err := tracker.forServer(event.GuildID).process(session, event.Message)
-		return err
+		counted, err := tracker.forServer(event.GuildID).process(session, event.Message)
+		if err != nil || !counted {
+			return err
+		}
+		_ = session.MessageReactionAdd(event.ChannelID, event.ID, "👀")
+		return nil
 	})
 	if err != nil {
 		reportError(session, event.ChannelID, err)
@@ -111,18 +115,11 @@ func (tracker *Tracker) process(sender messageSender, message *discordgo.Message
 		return false, nil // already counted this day
 	}
 
-	// Sunday gets the leaderboard instead of the daily tally.
+	// Sunday finishes the week off with the leaderboard.
 	if week.DayIndex(date) == DaysPerWeek-1 {
 		return true, tracker.finish(sender, &week, message)
 	}
-	if err := saveJSON(tracker.path(weeklyFile), &week); err != nil {
-		return true, err
-	}
-	_, err := sender.ChannelMessageSendComplex(message.ChannelID, &discordgo.MessageSend{
-		Embeds:    []*discordgo.MessageEmbed{dailyEmbed(&week, date)},
-		Reference: message.Reference(),
-	})
-	return true, err
+	return true, saveJSON(tracker.path(weeklyFile), &week)
 }
 
 // record adds the results from message to week, starting the week if it's
@@ -178,20 +175,6 @@ func (tracker *Tracker) path(fileName string) string {
 	return filepath.Join(tracker.dataDir, fileName)
 }
 
-// dailyEmbed shows the week's running tally after date's results.
-func dailyEmbed(week *Week, date string) *discordgo.MessageEmbed {
-	parsedDate, _ := time.Parse(dateLayout, date)
-	dayNumber := week.DayIndex(date) + 1
-	return &discordgo.MessageEmbed{
-		Title:       "📊 Wordle Weekly Tally — " + parsedDate.Format("Monday 2 Jan"),
-		Description: standingsText(week, dayNumber*MaxScore, dayNumber),
-		Color:       tallyColour,
-		Footer: &discordgo.MessageEmbedFooter{
-			Text: fmt.Sprintf("Day %d of %d", dayNumber, DaysPerWeek),
-		},
-	}
-}
-
 // leaderboardEmbed shows the week's final standings.
 func leaderboardEmbed(week *Week) *discordgo.MessageEmbed {
 	weekStart, _ := time.Parse(dateLayout, week.Start)
@@ -200,7 +183,7 @@ func leaderboardEmbed(week *Week) *discordgo.MessageEmbed {
 	// description instead.
 	heading := fmt.Sprintf("# 🏆 Wordle Weekly Leaderboard\n**%s – %s**\n\n", weekStart.Format("2 Jan"), weekEnd.Format("2 Jan"))
 	return &discordgo.MessageEmbed{
-		Description: heading + standingsText(week, DaysPerWeek*MaxScore, DaysPerWeek),
+		Description: heading + standingsText(week),
 		Color:       leaderboardColour,
 		Footer: &discordgo.MessageEmbedFooter{
 			Text: ("See you next week! <3 from Pancake"),
@@ -211,10 +194,9 @@ func leaderboardEmbed(week *Week) *discordgo.MessageEmbed {
 // medals are shown in place of the top three ranks.
 var medals = []string{"🥇", "🥈", "🥉"}
 
-// standingsText lists the week's players by rank, scored out of maxScore over
-// the given number of days. Ties share a line, and the top three get medals
-// and a bigger line.
-func standingsText(week *Week, maxScore, days int) string {
+// standingsText lists the week's players by rank. Ties share a line, and the
+// top three get medals and a bigger line.
+func standingsText(week *Week) string {
 	standings := week.Standings()
 	if len(standings) == 0 {
 		return "Dead game" // Needed to handle gracefully
@@ -224,13 +206,13 @@ func standingsText(week *Week, maxScore, days int) string {
 	for _, tied := range groupByRank(standings) {
 		rank := tied[0].Rank
 		if rank <= len(medals) {
-			fmt.Fprintf(&text, "### %s %s\n", medals[rank-1], tiedPlayersText(tied, maxScore, days))
+			fmt.Fprintf(&text, "### %s %s\n", medals[rank-1], tiedPlayersText(tied))
 			continue
 		}
 		if rank == len(medals)+1 {
 			text.WriteString("\n") // gap between the medals and everyone else
 		}
-		fmt.Fprintf(&text, "**%s** %s\n", ordinal(rank), tiedPlayersText(tied, maxScore, days))
+		fmt.Fprintf(&text, "**%s** %s\n", ordinal(rank), tiedPlayersText(tied))
 	}
 	return text.String()
 }
@@ -250,7 +232,7 @@ func groupByRank(standings []Standing) [][]Standing {
 
 // tiedPlayersText names players who share a rank, followed by their score.
 // Days played goes at the end if they all match, otherwise next to each name.
-func tiedPlayersText(tied []Standing, maxScore, days int) string {
+func tiedPlayersText(tied []Standing) string {
 	sameDaysPlayed := true
 	for _, standing := range tied {
 		if standing.DaysPlayed != tied[0].DaysPlayed {
@@ -262,7 +244,7 @@ func tiedPlayersText(tied []Standing, maxScore, days int) string {
 	for index, standing := range tied {
 		name := "<@" + standing.UserID + ">"
 		if !sameDaysPlayed {
-			name += fmt.Sprintf(" (%d/%d)", standing.DaysPlayed, days)
+			name += fmt.Sprintf(" (%d/%d)", standing.DaysPlayed, DaysPerWeek)
 		}
 		if standing.DaysPlayed == DaysPerWeek {
 			name += " 🔥"
@@ -270,9 +252,9 @@ func tiedPlayersText(tied []Standing, maxScore, days int) string {
 		names[index] = name
 	}
 
-	line := fmt.Sprintf("%s — **%d**/%d", strings.Join(names, ", "), tied[0].Score, maxScore)
+	line := fmt.Sprintf("%s — **%d**/%d", strings.Join(names, ", "), tied[0].Score, DaysPerWeek*MaxScore)
 	if sameDaysPlayed {
-		line += fmt.Sprintf(" + %d/%d days", tied[0].DaysPlayed, days)
+		line += fmt.Sprintf(" + %d/%d days", tied[0].DaysPlayed, DaysPerWeek)
 	}
 	return line
 }
